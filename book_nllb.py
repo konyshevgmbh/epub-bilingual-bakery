@@ -146,19 +146,67 @@ def generate_hash(text):
     # Create SHA256 hash and return the hexadecimal digest
     return hashlib.sha256(cleaned_text.encode('utf-8')).hexdigest()
 
-def translate_text(german_text):
-    """Translate text using NLLB"""
+def translate_text(german_text, max_repetition_count=3):
+    """Translate text using NLLB with repetition handling"""
     cleaned_german_text = clean_text(german_text)
     inputs = tokenizer(cleaned_german_text, return_tensors="pt").to(device)
+    
+    # Configure generation with parameters to reduce repetition
     translated_tokens = model.generate(
         **inputs,
         forced_bos_token_id=tokenizer.convert_tokens_to_ids("rus_Cyrl"),
-        max_length=500
+        max_length=1500,
+        num_beams=5,           # Increase beam search width
+        no_repeat_ngram_size=3, # Prevent repeating 3-grams
+        repetition_penalty=2.5, # Penalize token repetition
+        length_penalty=1.0,     # Avoid generating very short or long outputs
+        early_stopping=True     # Stop when all beams reach EOS
     )
+    
     translated_text = tokenizer.batch_decode(
         translated_tokens, skip_special_tokens=True)[0]
+    
+    # Post-processing to remove excessive repetition
+    translated_text = fix_repetitions(translated_text, max_repetition_count)
+    
     return translated_text
 
+def fix_repetitions(text, max_repetition_count=3):
+    """Post-process translated text to fix excessive repetitions"""
+    # Split into words
+    words = text.split()
+    result = []
+    
+    # Track consecutive occurrences of each word
+    repetition_count = {}
+    last_word = None
+    
+    for word in words:
+        if word == last_word:
+            repetition_count[word] = repetition_count.get(word, 1) + 1
+            
+            # Skip if we've seen this word too many times consecutively
+            if repetition_count[word] > max_repetition_count:
+                continue
+        else:
+            repetition_count = {word: 1}
+        
+        result.append(word)
+        last_word = word
+    
+    # Check for patterns of repeating phrases (e.g., "hello world hello world hello world")
+    final_text = " ".join(result)
+    for phrase_length in range(2, 6):  # Check for repeating phrases of lengths 2-5
+        for i in range(0, len(result) - phrase_length * 2):
+            phrase1 = " ".join(result[i:i+phrase_length])
+            phrase2 = " ".join(result[i+phrase_length:i+phrase_length*2])
+            
+            if phrase1 == phrase2:
+                # If we find a repeating phrase pattern, replace it with just one occurrence
+                pattern = (phrase1 + " ") * 2 + "+"
+                final_text = re.sub(pattern, phrase1 + " ", final_text)
+    
+    return final_text
 
 wordlist_connection = sqlite3.connect('wordlist.sqlite')
 wordlist_cursor = wordlist_connection.cursor()
@@ -511,7 +559,7 @@ def process_epub(input_file, output_file, translate_limit=0):
 if __name__ == "__main__":
     input_file = 'input.epub'
     output_file = 'output.epub'
-    translate_limit = 0  # 0 means translate all text blocks
+    translate_limit = 26  # 0 means translate all text blocks
 
     process_epub(input_file, output_file, translate_limit)
 
