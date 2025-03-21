@@ -7,11 +7,85 @@ import torch
 from collections import Counter
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from keybert import KeyBERT
+import nltk
+from nltk.tokenize import sent_tokenize
+import re
+nltk.download('punkt')
 
-# Initialize SQLite database
+# Initialiаze SQLite database
 translations_database_connection = sqlite3.connect('translations.sqlite')
 cursor = translations_database_connection.cursor()
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def segment_text(text, min_words=5, max_words=15):
+    """
+    Break text into meaningful segments of 5-15 words.
+    Prioritizes splitting at sentence boundaries, then at commas and other punctuation.
+    """
+    # First, split into sentences
+    sentences = sent_tokenize(text)
+    segments = []
+    
+    for sentence in sentences:
+        # If sentence is already in the desired word range, keep it as is
+        word_count = len(sentence.split())
+        if min_words <= word_count <= max_words:
+            segments.append(sentence)
+            continue
+            
+        # If sentence is too short, we'll handle it separately
+        if word_count < min_words:
+            segments.append(sentence)
+            continue
+            
+        # If sentence is too long, split at commas, semicolons, etc.
+        clause_separators = re.split(r'([,;:])', sentence)
+        current_segment = ""
+        current_word_count = 0
+        
+        for i in range(len(clause_separators)):
+            part = clause_separators[i]
+            part_word_count = len(part.split())
+            
+            # If this is a punctuation separator (single item)
+            if part_word_count == 0 and part in [',', ';', ':']:
+                current_segment += part
+                continue
+                
+            # Check if adding this part would exceed max_words
+            if current_word_count + part_word_count > max_words:
+                # If current segment is not empty and has enough words, add it
+                if current_segment and len(current_segment.split()) >= min_words:
+                    segments.append(current_segment.strip())
+                    current_segment = part
+                    current_word_count = part_word_count
+                else:
+                    # If we can't create a segment with min_words, use simpler splitting
+                    words = part.split()
+                    temp_segment = current_segment
+                    for word in words:
+                        if len(temp_segment.split()) + 1 > max_words:
+                            segments.append(temp_segment.strip())
+                            temp_segment = word
+                        else:
+                            temp_segment += " " + word
+                    current_segment = temp_segment
+                    current_word_count = len(current_segment.split())
+            else:
+                # Add part to current segment
+                if current_segment:
+                    current_segment += part
+                else:
+                    current_segment = part
+                current_word_count += part_word_count
+        
+        # Add the last segment if it's not empty
+        if current_segment:
+            segments.append(current_segment.strip())
+    
+    # Final cleanup of segments
+    return [segment for segment in segments if segment and len(segment.split()) >= min_words or len(segment) > 10]
 
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS translations (
@@ -326,29 +400,36 @@ def process_epub(input_file, output_file, translate_limit=0):
             print(f"Processing document...")
             soup = BeautifulSoup(item.get_content(), 'html.parser')
 
-            # Modify this list to include other tags if needed
             for tag in soup.find_all(['p']):
-                # Get all text nodes within the tag while preserving nested elements
-                text_nodes = [node for node in tag.descendants if isinstance(
-                    node, NavigableString)]
-
-                for node in text_nodes:
+                # Extract full text from paragraph, ignoring individual elements
+                full_text = tag.get_text()
+                
+                if not full_text.strip():
+                    continue
+                
+                # Get segments from the full text
+                segments = segment_text(full_text)
+                
+                # Create a new paragraph to replace the old one
+                new_p = soup.new_tag('p')
+                
+                for segment in segments:
                     if translate_limit > 0 and translated_count >= translate_limit:
                         break  # Stop if the translation limit is reached
-
-                    text = node.strip()
-                    if text:
-                        print(
-                            f"Translation ({translated_count + 1}): {text[:50]}...")
-                        translated_count += 1
-
-                        json_translation = get_json_translation(text)
-                        translated_text = make_string_translation(
-                            json_translation)
-
-                        if translated_text:
-                            # Replace only the text node, keeping the structure intact
-                            node.replace_with(translated_text)
+                    
+                    print(f"Translation ({translated_count + 1}): {segment[:50]}...")
+                    translated_count += 1
+                    
+                    json_translation = get_json_translation(segment)
+                    translated_segment = make_string_translation(json_translation)
+                    
+                    if translated_segment:
+                        new_p.append(translated_segment)
+                        # Add a space between segments for readability
+                        new_p.append(" ")
+                
+                # Replace the original paragraph with the new one
+                tag.replace_with(new_p)
 
             item.set_content(str(soup).encode('utf-8'))
 
