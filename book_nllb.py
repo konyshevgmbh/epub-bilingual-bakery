@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import hashlib
 from bs4 import BeautifulSoup, NavigableString
 from ebooklib import epub
 import ebooklib
@@ -12,7 +13,7 @@ from nltk.tokenize import sent_tokenize
 import re
 nltk.download('punkt')
 
-# Initialiаze SQLite database
+# Initialize SQLite database
 translations_database_connection = sqlite3.connect('translations.sqlite')
 cursor = translations_database_connection.cursor()
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -22,6 +23,7 @@ def segment_text(text, min_words=5, max_words=15):
     """
     Break text into meaningful segments of 5-15 words.
     Prioritizes splitting at sentence boundaries, then at commas and other punctuation.
+    Returns segments with unique tags.
     """
     # First, split into sentences
     sentences = sent_tokenize(text)
@@ -87,10 +89,12 @@ def segment_text(text, min_words=5, max_words=15):
     # Final cleanup of segments
     return [segment for segment in segments if segment and len(segment.split()) >= min_words or len(segment) > 10]
 
+# Update the database schema to use a hash key instead of the full text
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS translations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        german_text TEXT UNIQUE,
+        text_hash TEXT UNIQUE,
+        german_text TEXT,
         json_translation TEXT
     )
 ''')
@@ -105,7 +109,7 @@ cursor.execute('''
 ''')
 
 cursor.execute(
-    "CREATE INDEX IF NOT EXISTS idx_translations ON translations(german_text)")
+    "CREATE INDEX IF NOT EXISTS idx_translations ON translations(text_hash)")
 cursor.execute(
     "CREATE INDEX IF NOT EXISTS idx_word_frequency ON word_frequency(word)")
 translations_database_connection.commit()
@@ -134,6 +138,13 @@ def clean_text(text):
     text = text.replace('\u00a0', ' ')
     text = text.replace('\u2013', '-')
     return text
+
+def generate_hash(text):
+    """Generate a unique hash for the given text"""
+    # Clean the text first to ensure consistent hashing
+    cleaned_text = clean_text(text)
+    # Create SHA256 hash and return the hexadecimal digest
+    return hashlib.sha256(cleaned_text.encode('utf-8')).hexdigest()
 
 def translate_text(german_text):
     """Translate text using NLLB"""
@@ -173,7 +184,7 @@ def extract_keywords(text, top_n=10):
 
     updated_keywords = []
     for keyword, score in keywords:
-        if len( keyword) < 3:   
+        if len(keyword) < 3:   
             continue
         if keyword.lower() in ELEMENTARY_WORDS:
             continue
@@ -198,55 +209,57 @@ def translate_keyword(word):
     return translated_word
 
 
-def create_json_translation(german_text, russian_text, keywords):
-    """Create JSON structure with translation"""
-    # Split text into sentences (simple splitting by periods)
-    german_sentences = german_text.replace('. ', '.|').split('|')
-    russian_sentences = russian_text.replace('. ', '.|').split('|')
+def create_tagged_translation_text(segments):
+    """Create a single text with tagged segments for translation."""
+    tagged_text = ""
+    for i, segment in enumerate(segments):
+        tag = f"[{i:04d}]"
+        tagged_text += f" {tag} {segment} "
+    return tagged_text.strip()
 
-    # Align the number of sentences
-    min_len = min(len(german_sentences), len(russian_sentences))
-    german_sentences = german_sentences[:min_len]
-    russian_sentences = russian_sentences[:min_len]
 
+def split_translated_text(translated_text):
+    """Split the translated text based on tags."""
+    pattern = r"\[(\d{4})\](.*?)(?=\[\d{4}\]|$)"
+    matches = re.findall(pattern, translated_text, re.DOTALL)
+    result = {}
+    
+    for tag_num, content in matches:
+        result[int(tag_num)] = content.strip()
+    
+    return result
+
+
+def create_json_translation(german_segments, russian_segments):
+    """Create JSON structure with translation using segments."""
     translations = []
-
-    # If the text is short, process it as a single sentence
-    if len(german_text.split()) <= 20:
+    
+    for i, german_segment in enumerate(german_segments):
+        if i not in russian_segments:
+            continue
+            
+        russian_segment = russian_segments[i]
+        
+        # Skip empty segments
+        if not german_segment.strip() or not russian_segment.strip():
+            continue
+            
+        # Extract keywords for this segment
+        keywords = extract_keywords(german_segment, top_n=5)
+        
         word_list = []
         for keyword, score in keywords:
             if score > 0.2:  # Use only words with sufficient weight
                 translated_keyword = translate_keyword(keyword)
                 word_list.append({keyword: translated_keyword})
-
+                
         entry = {
-            "ge": german_text,
-            "ru": russian_text,
+            "ge": german_segment,
+            "ru": russian_segment,
             "w": word_list
         }
         translations.append(entry)
-    else:
-        # Split long text into parts
-        for i in range(min_len):
-            if not german_sentences[i].strip() or not russian_sentences[i].strip():
-                continue
-
-            # Extract keywords for each sentence
-            sentence_keywords = extract_keywords(german_sentences[i], top_n=5)
-
-            word_list = []
-            for keyword, score in sentence_keywords:
-                if score > 0.2 and keyword.lower() not in ELEMENTARY_WORDS:
-                    translated_keyword = translate_keyword(keyword)
-                    word_list.append({keyword: translated_keyword})
-
-            entry = {
-                "ge": german_sentences[i],
-                "ru": russian_sentences[i],
-                "w": word_list
-            }
-            translations.append(entry)
-
+        
     return translations
 
 
@@ -301,7 +314,7 @@ def make_string_translation(json_translation):
         if not ge or not ru:
             continue
         
-        if len( ge ) < 3:   
+        if len(ge) < 3:   
             continue
 
         # Skip numbers
@@ -347,42 +360,101 @@ def initialize_word_frequency():
     # First, clear the word frequency table
     cursor.execute("DELETE FROM word_frequency")
     translations_database_connection.commit()
+    
+    # Rebuild word frequency from existing translations
+    cursor.execute("SELECT json_translation FROM translations")
+    results = cursor.fetchall()
+    
+    for result in results:
+        try:
+            json_data = json.loads(result[0])
+            for entry in json_data:
+                if 'w' in entry:
+                    for word_obj in entry['w']:
+                        for german_word, _ in word_obj.items():
+                            cursor.execute(
+                                "INSERT OR IGNORE INTO word_frequency (word) VALUES (?)", 
+                                (german_word,)
+                            )
+                            cursor.execute(
+                                "UPDATE word_frequency SET count = count + 1 WHERE word = ?", 
+                                (german_word,)
+                            )
+        except Exception as e:
+            print(f"Error rebuilding word frequency: {e}")
+    
+    translations_database_connection.commit()
 
 
-def get_json_translation(german_text):
-    """Get JSON translation from the database or create a new one"""
-    сleaned_german_text = clean_text(german_text)
-    if сleaned_german_text.isdigit() or len(сleaned_german_text) < 3:  # Skip numbers
-        return [{"ge": сleaned_german_text, "ru": сleaned_german_text, "w": []}]
-
-
-    cursor.execute(
-        "SELECT json_translation FROM translations WHERE german_text = ?", (сleaned_german_text,))
+def get_cached_translation(german_text):
+    """Check if a translation exists in the database using hash as key"""
+    text_hash = generate_hash(german_text)
+    print(f"Checking cache for hash {text_hash}.")
+  # Ensure a fresh connection
+ 
+    cursor.execute("SELECT json_translation FROM translations WHERE text_hash = ?", (text_hash,))
     result = cursor.fetchone()
+
     if result:
-        return json.loads(result[0])
+        return json.loads(result[0])  # Decode JSON properly
+    return None
+
+
+
+def save_translation_to_db(german_text, json_data):
+    cleaned_text = clean_text(german_text)
+    text_hash = generate_hash(cleaned_text)
+
+    print(f"Saving translation to database with hash {text_hash}")
 
     try:
-        # Translate the text
-        russian_text = translate_text(сleaned_german_text)
+        cursor.execute(
+            "INSERT INTO translations (text_hash, german_text, json_translation) VALUES (?, ?, ?) "
+            "ON CONFLICT(text_hash) DO UPDATE SET json_translation = excluded.json_translation",
+            (text_hash, german_text[:1000], json.dumps(json_data))
+        )
+        translations_database_connection.commit()  # 🔥 Ensure data is saved
+        print("✅ Translation saved successfully!")
+    except sqlite3.IntegrityError:
+        print("❌ UNIQUE constraint failed! Entry already exists.")
 
-        # Extract keywords
-        keywords = extract_keywords(сleaned_german_text, top_n=10)
-
-        # Create JSON structure
-        translated_data = create_json_translation(
-            сleaned_german_text, russian_text, keywords)
-
-        # Save to database
-        cursor.execute("INSERT INTO translations (german_text, json_translation) VALUES (?, ?)",
-                       (сleaned_german_text, json.dumps(translated_data)))
-        translations_database_connection.commit()
-
-        return translated_data
-
-    except Exception as e:
-        print(f"Translation error: {e}")
+def get_paragraph_translation(paragraph_text):
+    """Translate a full paragraph by breaking it into segments, tagging, translating, and reassembling."""
+    # Check if we already have this paragraph hash in the database
+    cached_translation = get_cached_translation(paragraph_text)
+    if cached_translation:
+        return cached_translation
+        
+    # Break paragraph into segments
+    segments = segment_text(paragraph_text)
+    
+    if not segments:
         return []
+        
+    # If only one segment and it's very short, translate directly
+    if len(segments) == 1 and len(segments[0].split()) < 10:
+        russian_text = translate_text(segments[0])
+        keywords = extract_keywords(segments[0], top_n=5)
+        json_data = create_json_translation([segments[0]], {0: russian_text})
+        save_translation_to_db(paragraph_text, json_data)
+        return json_data
+        
+    # Create tagged text for translation
+    tagged_text = create_tagged_translation_text(segments)
+    print(f"Tagged text: {tagged_text[:100]}...")
+    # Translate the entire tagged text
+    translated_tagged_text = translate_text(tagged_text)
+    print(f"Translated text: {translated_tagged_text[:100]}...")
+    # Split the translated text back into segments
+    translated_segments = split_translated_text(translated_tagged_text)
+    
+    # Create JSON structure for each segment
+    json_data = create_json_translation(segments, translated_segments)
+    
+    # Save the whole paragraph translation to the database
+    save_translation_to_db(paragraph_text, json_data)
+    
+    return json_data
 
 
 # Initialize word frequency counter when the script starts
@@ -401,43 +473,39 @@ def process_epub(input_file, output_file, translate_limit=0):
             soup = BeautifulSoup(item.get_content(), 'html.parser')
 
             for tag in soup.find_all(['p']):
-                # Extract full text from paragraph, ignoring individual elements
-                full_text = tag.get_text()
+                # Skip if we've reached the translation limit
+                if translate_limit > 0 and translated_count >= translate_limit:
+                    break
                 
-                if not full_text.strip():
+                # Extract full text from paragraph
+                full_text = tag.get_text().strip()
+                
+                if not full_text:
                     continue
                 
-                # Get segments from the full text
-                segments = segment_text(full_text)
+                print(f"Translating paragraph ({translated_count + 1}): {full_text[:50]}...")
+                translated_count += 1
                 
-                # Create a new paragraph to replace the old one
-                new_p = soup.new_tag('p')
+                # Translate the entire paragraph at once
+                json_translation = get_paragraph_translation(full_text)
                 
-                for segment in segments:
-                    if translate_limit > 0 and translated_count >= translate_limit:
-                        break  # Stop if the translation limit is reached
-                    
-                    print(f"Translation ({translated_count + 1}): {segment[:50]}...")
-                    translated_count += 1
-                    
-                    json_translation = get_json_translation(segment)
-                    translated_segment = make_string_translation(json_translation)
-                    
-                    if translated_segment:
-                        new_p.append(translated_segment)
-                        # Add a space between segments for readability
-                        new_p.append(" ")
+                # Create the translated content
+                translated_content = make_string_translation(json_translation)
                 
-                # Replace the original paragraph with the new one
-                tag.replace_with(new_p)
+                # Replace the original paragraph with the translated version
+                if translated_content:
+                    new_p = soup.new_tag('p')
+                    new_p.append(translated_content)
+                    tag.replace_with(new_p)
 
             item.set_content(str(soup).encode('utf-8'))
 
     # Save the translated EPUB
     epub.write_epub(output_file, book)
     print(f"EPUB successfully translated and saved to {output_file}")
-    print(f"Total text blocks translated: {translated_count}")
+    print(f"Total paragraphs translated: {translated_count}")
 
+ 
 
 # Run EPUB translation
 if __name__ == "__main__":
