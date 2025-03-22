@@ -122,11 +122,11 @@ def extract_keywords(text, top_n=10):
     for keyword, score in keywords:
         if len( keyword) < 3:   
             continue
-        if keyword.lower() in ELEMENTARY_WORDS:
-            continue
         if keyword.isdigit():   
             continue
         updated_keyword = get_db_word(keyword)
+        if(updated_keyword == '-'):
+            continue
         updated_keywords.append((updated_keyword, score))
 
     return updated_keywords
@@ -172,13 +172,6 @@ def filter_words(word_objects):
         if isinstance(word_obj, str):
             continue
         for german_word, translation in word_obj.items():
-            # Check if the word is elementary
-            if any(elem_word == german_word.lower().strip() for elem_word in ELEMENTARY_WORDS):
-                continue
-
-            # Skip words with more than 3 parts
-            if len(german_word.split()) > 3:
-                continue
 
             # Check word frequency in the database
             cursor.execute(
@@ -354,16 +347,6 @@ nltk.download('punkt')
 translations_database_connection = sqlite3.connect('translations.sqlite')
 cursor = translations_database_connection.cursor()
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# List of elementary words to exclude
-ELEMENTARY_WORDS = [
-    "der", "die", "das", "den", "dem", "ein", "eine", "einer", "eines", "einem", "einen",
-    "an", "in", "zu", "auf", "mit", "von", "bei", "nach", "aus", "für", "um",
-    "durch", "über", "unter", "vor", "hinter", "neben", "zwischen", "und", "oder",
-    "aber", "denn", "weil", "wenn", "als", "dass", "ob", "ist", "sind", "war",
-    "waren", "sein", "haben", "hatte", "hatten", "werden", "wurde", "wurden",
-    "nicht", "kein", "keine", "keinem", "keinen", "keiner", "keines", "nur", "auch",
-    "schon", "noch", "wieder", "immer", "dann", "darum", "deshalb", "trotzdem"
-]
 
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS translations (

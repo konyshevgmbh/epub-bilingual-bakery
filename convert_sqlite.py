@@ -2,6 +2,17 @@ import json
 import sqlite3
 import os
 
+# List of elementary words to exclude
+ELEMENTARY_WORDS = [
+    "der", "die", "das", "den", "dem", "ein", "eine", "einer", "eines", "einem", "einen",
+    "an", "in", "zu", "auf", "mit", "von", "bei", "nach", "aus", "für", "um",
+    "durch", "über", "unter", "vor", "hinter", "neben", "zwischen", "und", "oder",
+    "aber", "denn", "weil", "wenn", "als", "dass", "ob", "ist", "sind", "war",
+    "waren", "sein", "haben", "hatte", "hatten", "werden", "wurde", "wurden",
+    "nicht", "kein", "keine", "keinem", "keinen", "keiner", "keines", "nur", "auch",
+    "schon", "noch", "wieder", "immer", "dann", "darum", "deshalb", "trotzdem"
+]
+
 # Reading data from a JSON file
 try:
     with open('german_nouns_output.json', 'r', encoding='utf-8') as file:
@@ -35,6 +46,11 @@ cursor.execute('''
 
 # Processing and inserting data
 inserted_count = 0
+# Add elementary words to database with empty word value
+for elementary_word in ELEMENTARY_WORDS:
+    cursor.execute("INSERT INTO words (key, word) VALUES (?, ?)", (elementary_word, "-"))
+    inserted_count += 1
+
 for item in json_data:
     if "germanNoun" in item and "gender" in item:
         key = item["germanNoun"].lower()
