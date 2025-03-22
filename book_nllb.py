@@ -10,12 +10,6 @@ from keybert import KeyBERT
 import nltk
 from nltk.tokenize import sent_tokenize
 import re
-nltk.download('punkt')
-
-# Initialiаze SQLite database
-translations_database_connection = sqlite3.connect('translations.sqlite')
-cursor = translations_database_connection.cursor()
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def segment_text(text, min_words=5, max_words=15):
@@ -87,49 +81,6 @@ def segment_text(text, min_words=5, max_words=15):
     # Final cleanup of segments
     return [segment for segment in segments if segment and len(segment.split()) >= min_words or len(segment) > 10]
 
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS translations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        german_text TEXT UNIQUE,
-        json_translation TEXT
-    )
-''')
-
-
-# Add a table for tracking word frequency
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS word_frequency (
-        word TEXT PRIMARY KEY,
-        count INTEGER DEFAULT 1
-    )
-''')
-
-cursor.execute(
-    "CREATE INDEX IF NOT EXISTS idx_translations ON translations(german_text)")
-cursor.execute(
-    "CREATE INDEX IF NOT EXISTS idx_word_frequency ON word_frequency(word)")
-translations_database_connection.commit()
-
-# List of elementary words to exclude
-ELEMENTARY_WORDS = [
-    "der", "die", "das", "den", "dem", "ein", "eine", "einer", "eines", "einem", "einen",
-    "an", "in", "zu", "auf", "mit", "von", "bei", "nach", "aus", "für", "um",
-    "durch", "über", "unter", "vor", "hinter", "neben", "zwischen", "und", "oder",
-    "aber", "denn", "weil", "wenn", "als", "dass", "ob", "ist", "sind", "war",
-    "waren", "sein", "haben", "hatte", "hatten", "werden", "wurde", "wurden",
-    "nicht", "kein", "keine", "keinem", "keinen", "keiner", "keines", "nur", "auch",
-    "schon", "noch", "wieder", "immer", "dann", "darum", "deshalb", "trotzdem"
-]
-
-# Loading models
-print("Loading NLLB and KeyBERT models...")
-tokenizer = AutoTokenizer.from_pretrained(
-    "facebook/nllb-200-1.3B", src_lang="deu_Latn", tgt_lang="rus_Cyrl")
-model = AutoModelForSeq2SeqLM.from_pretrained(
-    "facebook/nllb-200-1.3B").to(device)
-kw_model = KeyBERT()
-print("Models loaded")
-
 def clean_text(text):
     text = text.replace('\u00a0', ' ')
     text = text.replace('\u2013', '-')
@@ -147,10 +98,6 @@ def translate_text(german_text):
     translated_text = tokenizer.batch_decode(
         translated_tokens, skip_special_tokens=True)[0]
     return translated_text
-
-
-wordlist_connection = sqlite3.connect('wordlist.sqlite')
-wordlist_cursor = wordlist_connection.cursor()
 
 
 def get_db_word(keyword):
@@ -200,53 +147,21 @@ def translate_keyword(word):
 
 def create_json_translation(german_text, russian_text, keywords):
     """Create JSON structure with translation"""
-    # Split text into sentences (simple splitting by periods)
-    german_sentences = german_text.replace('. ', '.|').split('|')
-    russian_sentences = russian_text.replace('. ', '.|').split('|')
-
-    # Align the number of sentences
-    min_len = min(len(german_sentences), len(russian_sentences))
-    german_sentences = german_sentences[:min_len]
-    russian_sentences = russian_sentences[:min_len]
 
     translations = []
+    word_list = []
+    for keyword, score in keywords:
+        if score > 0.2:  # Use only words with sufficient weight
+            translated_keyword = translate_keyword(keyword)
+            word_list.append({keyword: translated_keyword})
 
-    # If the text is short, process it as a single sentence
-    if len(german_text.split()) <= 20:
-        word_list = []
-        for keyword, score in keywords:
-            if score > 0.2:  # Use only words with sufficient weight
-                translated_keyword = translate_keyword(keyword)
-                word_list.append({keyword: translated_keyword})
-
-        entry = {
-            "ge": german_text,
-            "ru": russian_text,
-            "w": word_list
-        }
-        translations.append(entry)
-    else:
-        # Split long text into parts
-        for i in range(min_len):
-            if not german_sentences[i].strip() or not russian_sentences[i].strip():
-                continue
-
-            # Extract keywords for each sentence
-            sentence_keywords = extract_keywords(german_sentences[i], top_n=5)
-
-            word_list = []
-            for keyword, score in sentence_keywords:
-                if score > 0.2 and keyword.lower() not in ELEMENTARY_WORDS:
-                    translated_keyword = translate_keyword(keyword)
-                    word_list.append({keyword: translated_keyword})
-
-            entry = {
-                "ge": german_sentences[i],
-                "ru": russian_sentences[i],
-                "w": word_list
-            }
-            translations.append(entry)
-
+    entry = {
+        "ge": german_text,
+        "ru": russian_text,
+        "w": word_list
+    }
+    translations.append(entry)
+    
     return translations
 
 
@@ -355,7 +270,6 @@ def get_json_translation(german_text):
     if сleaned_german_text.isdigit() or len(сleaned_german_text) < 3:  # Skip numbers
         return [{"ge": сleaned_german_text, "ru": сleaned_german_text, "w": []}]
 
-
     cursor.execute(
         "SELECT json_translation FROM translations WHERE german_text = ?", (сleaned_german_text,))
     result = cursor.fetchone()
@@ -383,11 +297,6 @@ def get_json_translation(german_text):
     except Exception as e:
         print(f"Translation error: {e}")
         return []
-
-
-# Initialize word frequency counter when the script starts
-print("Initializing word frequency counter from existing translations...")
-initialize_word_frequency()
 
 
 def process_epub(input_file, output_file, translate_limit=0):
@@ -438,6 +347,60 @@ def process_epub(input_file, output_file, translate_limit=0):
     print(f"EPUB successfully translated and saved to {output_file}")
     print(f"Total text blocks translated: {translated_count}")
 
+
+# Initialiаze punkt tokenizer
+nltk.download('punkt')
+# Initialiаze SQLite database
+translations_database_connection = sqlite3.connect('translations.sqlite')
+cursor = translations_database_connection.cursor()
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# List of elementary words to exclude
+ELEMENTARY_WORDS = [
+    "der", "die", "das", "den", "dem", "ein", "eine", "einer", "eines", "einem", "einen",
+    "an", "in", "zu", "auf", "mit", "von", "bei", "nach", "aus", "für", "um",
+    "durch", "über", "unter", "vor", "hinter", "neben", "zwischen", "und", "oder",
+    "aber", "denn", "weil", "wenn", "als", "dass", "ob", "ist", "sind", "war",
+    "waren", "sein", "haben", "hatte", "hatten", "werden", "wurde", "wurden",
+    "nicht", "kein", "keine", "keinem", "keinen", "keiner", "keines", "nur", "auch",
+    "schon", "noch", "wieder", "immer", "dann", "darum", "deshalb", "trotzdem"
+]
+
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS translations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        german_text TEXT UNIQUE,
+        json_translation TEXT
+    )
+''')
+
+# Add a table for tracking word frequency
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS word_frequency (
+        word TEXT PRIMARY KEY,
+        count INTEGER DEFAULT 1
+    )
+''')
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS idx_translations ON translations(german_text)")
+cursor.execute(
+    "CREATE INDEX IF NOT EXISTS idx_word_frequency ON word_frequency(word)")
+translations_database_connection.commit()
+
+# Loading models
+print("Loading NLLB and KeyBERT models...")
+tokenizer = AutoTokenizer.from_pretrained(
+    "facebook/nllb-200-1.3B", src_lang="deu_Latn", tgt_lang="rus_Cyrl")
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    "facebook/nllb-200-1.3B").to(device)
+kw_model = KeyBERT()
+print("Models loaded")
+
+wordlist_connection = sqlite3.connect('wordlist.sqlite')
+wordlist_cursor = wordlist_connection.cursor()
+
+# Initialize word frequency counter when the script starts
+print("Initializing word frequency counter from existing translations...")
+initialize_word_frequency()
 
 # Run EPUB translation
 if __name__ == "__main__":
