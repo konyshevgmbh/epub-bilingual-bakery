@@ -1,3 +1,5 @@
 *.epub
 __pycache__/*
+data/*
+hf_home/*
 

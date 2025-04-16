@@ -261,6 +261,11 @@ class TranslationEngine:
         except LookupError:
             nltk.download('punkt')
         
+        try:
+            nltk.data.find('tokenizers/punkt_tab')
+        except LookupError:
+            nltk.download('punkt_tab')
+        
         # Load models
         logger.info(f"Loading translation models on {config.device}...")
         self.tokenizer = AutoTokenizer.from_pretrained(

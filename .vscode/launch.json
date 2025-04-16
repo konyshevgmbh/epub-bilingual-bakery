@@ -11,7 +11,7 @@
             "request": "launch",
             "program": "book_nllb.py",
             "console": "integratedTerminal",
-            "args": "'Golluch, Norbert\\Sex macht klug\\Sex macht klug - Norbert Golluch.epub' output.epub"
+            "args": "'data//Das Doppelte Lottchen.epub' data//output.epub"
         }
     ]
 }
