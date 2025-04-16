@@ -1,6 +1,6 @@
-# German to Russian EPUB Translator
-All scripts are written just for fun. Convert German EPUB text to Russian,German bilingual text.
-
+# German to bilingual German-Russian EPUB Translator
+This tool can be used for translation between ANY languages.
+All scripts are created just for fun. By default, it converts German EPUB text into a bilingual German-Russian format.
 
 ## book_nllb.py
 Translates German EPUB text into a bilingual German-Russian format. The solution utilizes NLLB and KeyBERT. You can use it to translate between any languages by specifying the src_lang and tgt_lang parameters.
