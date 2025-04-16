@@ -1,0 +1,6 @@
+ebooklib
+nltk
+torch
+transformers
+bs4
+keybert

@@ -7,6 +7,10 @@ Translates German EPUB text into a bilingual German-Russian format using Gemma 3
 ## book_nllb.py
 Translates German EPUB text into a bilingual German-Russian format. The solution utilizes NLLB and KeyBERT. You can use it to translate between any languages by specifying the src_lang and tgt_lang parameters.
 
+![Sample output of book_nllb.py](sample.png)
+
+Just use VS Code and a devcontainer to run the script.
+
 ## convert_sqlite.py
 Reads German nouns from JSON, stores them in an SQLite database. For use with book_nllb.py.
 

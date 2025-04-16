@@ -261,6 +261,11 @@ class TranslationEngine:
         except LookupError:
             nltk.download('punkt')
         
+        try:
+            nltk.data.find('tokenizers/punkt_tab')
+        except LookupError:
+            nltk.download('punkt_tab')
+        
         # Load models
         logger.info(f"Loading translation models on {config.device}...")
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -548,8 +553,7 @@ def setup_argument_parser():
     # Optional arguments
     parser.add_argument('--src-lang', default='deu_Latn', help='Source language code')
     parser.add_argument('--tgt-lang', default='rus_Cyrl', help='Target language code')
-    parser.add_argument('--translation-db', default='translations.sqlite', 
-                        help='Path to translation database')
+    parser.add_argument('--translation-db', help='Path to translation database')
     parser.add_argument('--wordlist-db', default='wordlist.sqlite', 
                         help='Path to wordlist database')
     parser.add_argument('--model', default='facebook/nllb-200-1.3B', 
@@ -590,12 +594,13 @@ def configure_logging(log_level):
 
 def config_from_args(args):
     """Create a TranslationConfig object from command-line arguments."""
+    translation_db_path = args.translation_db if args.translation_db else Path(args.input_file).with_suffix('.sqlite')
     return TranslationConfig(
         input_file=args.input_file,
         output_file=args.output_file,
         src_lang=args.src_lang,
         tgt_lang=args.tgt_lang,
-        translation_db_path=args.translation_db,
+        translation_db_path=translation_db_path,  
         wordlist_db_path=args.wordlist_db,
         model_name=args.model,
         min_segment_words=args.min_words,
