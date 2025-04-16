@@ -24,7 +24,8 @@ from ebooklib import epub
 from keybert import KeyBERT
 from nltk.tokenize import sent_tokenize
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
+import os
+from sentence_transformers import SentenceTransformer
 
 # Setup logging
 logging.basicConfig(
@@ -255,32 +256,40 @@ class TranslationEngine:
         self.config = config
         self.db_manager = db_manager
         
+        # Ensure data directory exists
+        os.makedirs('./data', exist_ok=True)
+
         # Download NLTK data if needed
+        nltk.data.path.append('./data')
         try:
-            nltk.data.find('tokenizers/punkt')
+            nltk.data.find('tokenizers/punkt','./data')
         except LookupError:
-            nltk.download('punkt')
+            nltk.download('punkt','./data')
         
         try:
-            nltk.data.find('tokenizers/punkt_tab')
+            nltk.data.find('tokenizers/punkt_tab','./data')
         except LookupError:
-            nltk.download('punkt_tab')
+            nltk.download('punkt_tab','./data')
         
         # Load models
         logger.info(f"Loading translation models on {config.device}...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name, 
             src_lang=config.src_lang, 
-            tgt_lang=config.tgt_lang
+            tgt_lang=config.tgt_lang,
+            cache_dir="./data"
         )
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(config.model_name).to(config.device)
-        self.kw_model = KeyBERT()
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(config.model_name,cache_dir="./data").to(config.device)
+
+        model_path = "./data/all-MiniLM-L6-v2"
+        model = SentenceTransformer('all-MiniLM-L6-v2', cache_folder='./data')
+        self.kw_model = KeyBERT(model)
         logger.info("Models loaded successfully")
 
     def translate_text(self, text: str) -> str:
         """Translate text using the loaded model."""
         cleaned_text = TextProcessor.clean_text(text)
-        inputs = self.tokenizer(cleaned_text, return_tensors="pt").to(self.config.device)
+        inputs = self.tokenizer(cleaned_text, return_tensors="pt" ).to(self.config.device)
         
         translated_tokens = self.model.generate(
             **inputs,
