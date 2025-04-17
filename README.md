@@ -1,21 +1,41 @@
 # German to bilingual German-Russian EPUB Translator
-This tool can be used for translation between ANY languages.
+
+This tool helps transform foreign-language texts into bilingual format, where each sentence is followed by a partial translation with key words and phrases explained. This approach aids in intuitive understanding and vocabulary expansion through context.
+
 All scripts are created just for fun. By default, it converts German EPUB text into a bilingual German-Russian format.
 
-## book_nllb.py
-Translates German EPUB text into a bilingual German-Russian format. The solution utilizes NLLB and KeyBERT. You can use it to translate between any languages by specifying the src_lang and tgt_lang parameters.
+---
+
+## 📘 `book_nllb.py`
+
+Translates German EPUB text into a bilingual German-Russian format. The solution uses **NLLB** for translation and **KeyBERT** for keyword extraction.
+
+- Supports other language pairs via `src_lang` and `tgt_lang` parameters
+- Output contains inline translations of key vocabulary for contextual learning
 
 ![Sample output of book_nllb.py](sample.png)
 
-Just use VS Code and a devcontainer to run the script.
+> 💡 Use **VS Code** and a **devcontainer** to run the script.
 
-## convert_sqlite.py
-Reads German nouns from JSON, stores them in an SQLite database. For use with book_nllb.py.
+---
 
-## german_nouns_output.json
-https://github.com/Hanttone/der-die-das-game/blob/master/data/german_nouns_output.json
+## 🗃️ `convert_sqlite.py`
 
+Reads German nouns from a JSON file and stores them in an SQLite database.  
+Useful for vocabulary lookup in conjunction with `book_nllb.py`.
 
-## book_gemma.py
-Translates German EPUB text into a bilingual German-Russian format using Gemma 3 with assistance from Ollama. Generates natural, structured JSON translations, stores translations and word frequencies, and supports customizable word filtering. Designed for testing purposes—performance is slow.
-There is no setup environment for this script — it's just demonstration code.
+Source:  
+[german_nouns_output.json](https://github.com/Hanttone/der-die-das-game/blob/master/data/german_nouns_output.json)
+
+---
+
+## 🤖 `book_gemma.py`
+
+Experimental translation script using **Gemma 3** via **Ollama**.
+
+- Translates German EPUB to bilingual German-Russian JSON format
+- Generates structured output with word frequencies
+- Supports filtering and selective translation
+- Not optimized for performance — meant for testing
+
+> ⚠️ No setup or devcontainer for this script — demo code only.
