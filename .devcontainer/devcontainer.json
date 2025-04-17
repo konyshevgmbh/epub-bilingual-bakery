@@ -10,5 +10,8 @@
   "extensions": [
     "ms-python.python",
     "ms-toolsai.jupyter"
+  ],
+  "runArgs": [
+    "--gpus", "all"
   ]
 }
