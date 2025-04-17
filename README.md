@@ -1,5 +1,7 @@
 # German to bilingual German-Russian EPUB Translator
 
+![epub-bilingual-penetration banner](banner.png)
+
 This tool transforms foreign-language texts into a bilingual battleground, where every sentence is followed by a half-baked translation and a desperate attempt to explain the keywords. It’s like learning through osmosis, panic, and a healthy dose of linguistic trauma.
 
 All scripts are made just for fun — the kind of fun where German grammar haunts your dreams. By default, it converts German EPUB files into a German-Russian format, because pain loves company.
