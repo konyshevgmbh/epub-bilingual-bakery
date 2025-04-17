@@ -54,6 +54,7 @@ class TranslationConfig:
     translate_limit: int = 0  # 0 means translate all text
     log_level: str = "INFO"
     reset_word_frequency: bool = True
+    use_tags: bool = True
 
 
 class DBManager:
@@ -335,10 +336,59 @@ class TranslationEngine:
 
         return updated_keywords
 
+    def get_paragraph_translation(self, segments: List[str]):
+        if not segments or len(segments) < 2:
+            return
+
+        # Check if first segment is already translated
+        first_segment = segments[0].strip()
+        cached = self.db_manager.get_translation_from_db(first_segment)
+        if cached:
+            return
+
+        # Tag and translate all segments at once
+        tagged_text = " ".join([f"[{i:04d}] {segment}" for i, segment in enumerate(segments)])
+        translated_text = self.translate_text(tagged_text)
+
+        # Extract back segments
+        pattern = r"\[(\d{4})\](.*?)(?=\[\d{4}\]|$)"
+        matches = re.findall(pattern, translated_text, re.DOTALL)
+        translated_segments = {int(tag): content.strip() for tag, content in matches}
+
+        # Validate number of segments
+        if len(translated_segments) != len(segments):
+            logger.error(f"Mismatch in segment count: expected {len(segments)}, got {len(translated_segments)}")
+            return
+
+        # Validate that all indices are present
+        missing_indices = [i for i in range(len(segments)) if i not in translated_segments]
+        if missing_indices:
+            logger.error(f"Missing translations for segment indices: {missing_indices}")
+            return
+        
+        logger.info(f"Translated {len(segments)} segments successfully")
+        for i, segment in enumerate(segments):
+            ru = translated_segments.get(i, "")
+            if not ru:
+                logger.warning(f"Translation not found for segment {i}: {segment}")
+                continue
+
+            keywords = self.extract_keywords(segment)
+            word_list = []
+            for keyword, score in keywords:
+                if score > self.config.keyword_threshold:
+                    translated = self.translate_keyword(keyword)
+                    word_list.append({keyword: translated})
+
+            data = {"ge": segment, "ru": ru, "w": word_list}
+            self.db_manager.save_translation_to_db(segment, [data])
+
+        
+
     def get_translation(self, text: str) -> List[Dict]:
         """Get translation for a segment of text."""
         cleaned_text = TextProcessor.clean_text(text)
-        
+
         # Skip short or number-only text
         if cleaned_text.isdigit() or len(cleaned_text) < 3:
             return [{"ge": cleaned_text, "ru": cleaned_text, "w": []}]
@@ -522,6 +572,9 @@ class EpubProcessor:
             # Create a new paragraph to replace the old one
             new_p = soup.new_tag('p')
             
+            if self.config.use_tags:
+                self.translation_engine.get_paragraph_translation(segments )
+            
             # Process each segment
             for segment in segments:
                 # Check if translation limit reached
@@ -584,6 +637,7 @@ def setup_argument_parser():
                         default='INFO', help='Logging level')
     parser.add_argument('--no-reset-frequency', action='store_true', 
                         help="Don't reset word frequency counter")
+    parser.add_argument('--use-tags', action='store_true', help='Use tagged segment translation')
     
     return parser
 
@@ -619,7 +673,8 @@ def config_from_args(args):
         device=args.device,
         translate_limit=args.limit,
         log_level=args.log_level,
-        reset_word_frequency=not args.no_reset_frequency
+        reset_word_frequency=not args.no_reset_frequency,
+        use_tags=args.use_tags
     )
 
 
