@@ -1,41 +1,44 @@
 # German to bilingual German-Russian EPUB Translator
 
-This tool helps transform foreign-language texts into bilingual format, where each sentence is followed by a partial translation with key words and phrases explained. This approach aids in intuitive understanding and vocabulary expansion through context.
+This tool transforms foreign-language texts into a bilingual battleground, where every sentence is followed by a half-baked translation and a desperate attempt to explain the keywords. It’s like learning through osmosis, panic, and a healthy dose of linguistic trauma.
 
-All scripts are created just for fun. By default, it converts German EPUB text into a bilingual German-Russian format.
+All scripts are made just for fun — the kind of fun where German grammar haunts your dreams. By default, it converts German EPUB files into a German-Russian format, because pain loves company.
 
 ---
 
 ## 📘 `book_nllb.py`
 
-Translates German EPUB text into a bilingual German-Russian format. The solution uses **NLLB** for translation and **KeyBERT** for keyword extraction.
+Translates German EPUBs into bilingual German-Russian format using **NLLB** for translation and **KeyBERT** for keyword extraction, because what’s better than AI-powered confusion?
 
-- Supports other language pairs via `src_lang` and `tgt_lang` parameters
-- Output contains inline translations of key vocabulary for contextual learning
+- Supports other language pairs via `src_lang` and `tgt_lang` if you feel like suffering in new and exciting ways
+- Outputs bilingual text with inline keyword translations, for that immersive “am I doing this right?” experience
 
 ![Sample output of book_nllb.py](sample.png)
 
-> 💡 Use **VS Code** and a **devcontainer** to run the script.
+> 💡 Run it in **VS Code** using a **devcontainer** if you enjoy setting up environments more than actual learning.
 
 ---
 
 ## 🗃️ `convert_sqlite.py`
 
-Reads German nouns from a JSON file and stores them in an SQLite database.  
-Useful for vocabulary lookup in conjunction with `book_nllb.py`.
+Reads German nouns from a JSON file and crams them into an SQLite database.  
+Because nothing screams “language learning” like SQL queries and existential dread.
 
 Source:  
 [german_nouns_output.json](https://github.com/Hanttone/der-die-das-game/blob/master/data/german_nouns_output.json)
+
+Use it with `book_nllb.py` if you want to know which article goes with which noun — or at least pretend you do.
 
 ---
 
 ## 🤖 `book_gemma.py`
 
-Experimental translation script using **Gemma 3** via **Ollama**.
+Experimental translation script using **Gemma 3** via **Ollama**.  
+Because one working script wasn't chaotic enough.
 
-- Translates German EPUB to bilingual German-Russian JSON format
-- Generates structured output with word frequencies
-- Supports filtering and selective translation
-- Not optimized for performance — meant for testing
+- Translates German EPUBs into bilingual German-Russian JSON format
+- Outputs structured data with word frequencies, in case you're writing your thesis on why "doch" appears 900 times
+- Supports filtering and selective translation, like a Tinder for words
+- Absolutely not optimized — this is demo code, and you *will* feel it
 
-> ⚠️ No setup or devcontainer for this script — demo code only.
+> ⚠️ No setup, no devcontainer, no pity. Just raw, experimental code. Use at your own risk — or better yet, don’t.
