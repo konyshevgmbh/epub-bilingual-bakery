@@ -12,14 +12,14 @@ import logging
 import re
 import sqlite3
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import ebooklib
 import nltk
 import torch
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup
 from ebooklib import epub
 from keybert import KeyBERT
 from nltk.tokenize import sent_tokenize
@@ -282,7 +282,6 @@ class TranslationEngine:
         )
         self.model = AutoModelForSeq2SeqLM.from_pretrained(config.model_name,cache_dir="./data").to(config.device)
 
-        model_path = "./data/all-MiniLM-L6-v2"
         model = SentenceTransformer('all-MiniLM-L6-v2', cache_folder='./data')
         self.kw_model = KeyBERT(model)
         logger.info("Models loaded successfully")
@@ -491,7 +490,7 @@ class HTMLFormatter:
 
             translation_part = soup.new_tag("span")
             translation_part.append(bold_ge)
-            translation_part.append(f" ( ")
+            translation_part.append(" ( ")
             translation_part.append(italic_ru)
 
             # Add word translations if available
