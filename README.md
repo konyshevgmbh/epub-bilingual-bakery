@@ -24,7 +24,7 @@ This script converts German EPUBs into bilingual German-Russian EPUBs using:
 uv venv
 .venv\Scripts\activate  # On Windows
 uv pip install .
-python book_nllb.py input.epub data/output.epub
+python book_nllb.py input.epub output.epub
 ```
 
 ![Sample output of book_nllb.py](sample.png)
