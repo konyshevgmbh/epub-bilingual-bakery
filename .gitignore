@@ -3,3 +3,4 @@ __pycache__/*
 data/*
 hf_home/*
 
+*.egg-info/*

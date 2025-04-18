@@ -1,0 +1,17 @@
+[project]
+name = "epub-bilingual-penetration"
+version = "0.1.0"
+description = "German EPUB to bilingual German-Russian converter"
+requires-python = ">=3.8"
+readme = "README.md"
+
+dependencies = [
+    "ebooklib",
+    "nltk",
+    "torch",
+    "transformers",
+    "beautifulsoup4",
+    "keybert"
+]
+
+
