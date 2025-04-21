@@ -26,15 +26,60 @@ from nltk.tokenize import sent_tokenize
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
 from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger("ebook_translator")
 
+class OutputManager:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(OutputManager, cls).__new__(cls)
+            cls._instance.output_type = "log"
+        return cls._instance
+
+    def init(self, output_type="log", max_count=None):
+        self.output_type = output_type
+        if self.output_type == "log":
+            logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+        elif self.output_type == "progress":
+            if max_count is None:
+                raise ValueError("max_count must be specified for progress output")
+            self.progress = tqdm(total=max_count, bar_format="{desc}: {percentage:3.0f}%|{bar}|",desc="Starting", ncols=80)
+        else:
+            raise ValueError("output_type must be 'log' or 'progress'")
+
+    def _handle_message(self, level, message):
+        short_msg = message[:20].ljust(20)
+        if self.output_type == "log":
+            if level == "status":
+                level = "info"
+            getattr(logging, level)(short_msg)
+        elif self.output_type == "progress" and level == "status":
+            self.progress.set_description_str(short_msg)
+
+    def status(self, message):
+        self._handle_message("status", message)
+
+    def info(self, message):
+        self._handle_message("info", message)
+
+    def error(self, message):
+        self._handle_message("error", message)
+
+    def warning(self, message):
+        self._handle_message("warning", message)
+
+    def debug(self, message):
+        self._handle_message("debug", message)
+
+    def increase(self, step=1):
+        if self.output_type == "progress":
+            self.progress.update(step)
+
+    def close(self):
+        if self.output_type == "progress":
+            self.progress.close()
 
 @dataclass
 class TranslationConfig:
@@ -52,9 +97,9 @@ class TranslationConfig:
     max_keyword_count: int = 10
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     translate_limit: int = 0  # 0 means translate all text
-    log_level: str = "INFO"
     reset_word_frequency: bool = True
     use_tags: bool = True
+    show_progress: bool = True
 
 
 class DBManager:
@@ -105,7 +150,7 @@ class DBManager:
         """Reset the word frequency counter."""
         self.trans_cursor.execute("DELETE FROM word_frequency")
         self.trans_conn.commit()
-        logger.info("Word frequency counter reset")
+        OutputManager().info("Word frequency counter reset")
 
     def get_db_word(self, keyword: str) -> str:
         """Get a replacement word from the database if it exists."""
@@ -131,7 +176,7 @@ class DBManager:
             self.trans_conn.commit()
         except sqlite3.IntegrityError:
             # Handle case where translation already exists
-            logger.debug(f"Translation already exists for: {text[:30]}...")
+            OutputManager().debug(f"Translation already exists for: {text}")
 
     def update_word_frequency(self, word: str) -> bool:
         """Update word frequency and return True if it should be included."""
@@ -160,7 +205,7 @@ class DBManager:
             self.trans_conn.close()
         if self.wordlist_conn:
             self.wordlist_conn.close()
-        logger.info("Database connections closed")
+        OutputManager().info("Database connections closed")
 
 
 class TextProcessor:
@@ -273,7 +318,7 @@ class TranslationEngine:
             nltk.download('punkt_tab','./data')
         
         # Load models
-        logger.info(f"Loading translation models on {config.device}...")
+        OutputManager().info(f"Loading translation models on {config.device}")
         self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name, 
             src_lang=config.src_lang, 
@@ -284,7 +329,7 @@ class TranslationEngine:
 
         model = SentenceTransformer('all-MiniLM-L6-v2', cache_folder='./data')
         self.kw_model = KeyBERT(model)
-        logger.info("Models loaded successfully")
+        OutputManager().info("Models loaded successfully")
 
     def translate_text(self, text: str) -> str:
         """Translate text using the loaded model."""
@@ -356,20 +401,20 @@ class TranslationEngine:
 
         # Validate number of segments
         if len(translated_segments) != len(segments):
-            logger.error(f"Mismatch in segment count: expected {len(segments)}, got {len(translated_segments)}")
+            OutputManager().error(f"Mismatch in segment count: expected {len(segments)}, got {len(translated_segments)}")
             return
 
         # Validate that all indices are present
         missing_indices = [i for i in range(len(segments)) if i not in translated_segments]
         if missing_indices:
-            logger.error(f"Missing translations for segment indices: {missing_indices}")
+            OutputManager().error(f"Missing translations for segment indices: {missing_indices}")
             return
         
-        logger.info(f"Translated {len(segments)} segments successfully")
+        OutputManager().info(f"Translated {len(segments)} segments successfully")
         for i, segment in enumerate(segments):
             ru = translated_segments.get(i, "")
             if not ru:
-                logger.warning(f"Translation not found for segment {i}: {segment}")
+                OutputManager().warning(f"Translation not found for segment {i}: {segment}")
                 continue
 
             keywords = self.extract_keywords(segment)
@@ -413,7 +458,7 @@ class TranslationEngine:
             return translation_data
 
         except Exception as e:
-            logger.error(f"Translation error: {e}")
+            OutputManager().error(f"Translation error: {e}")
             return []
 
     def _create_translation_data(self, source_text: str, target_text: str, 
@@ -521,16 +566,27 @@ class EpubProcessor:
 
     def process_file(self):
         """Process an EPUB file, translating its content."""
-        logger.info(f"Processing file {self.config.input_file}...")
+        OutputManager().info(f"Processing file {self.config.input_file}")
         
         # Ensure input file exists
         input_path = Path(self.config.input_file)
         if not input_path.exists():
-            logger.error(f"Input file not found: {input_path}")
+            OutputManager().error(f"Input file not found: {input_path}")
             return
             
         # Read the EPUB
         book = epub.read_epub(str(input_path))
+        
+        # Count total paragraphs for progress bar if needed
+        total_paragraphs = 0
+        if self.config.show_progress:
+            for item in book.items:
+                if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                    soup = BeautifulSoup(item.get_content(), 'html.parser')
+                    total_paragraphs += len(soup.find_all(['p']))
+            
+            # Initialize progress bar
+            OutputManager().init( "progress", total_paragraphs)
         
         # Process each document in the EPUB
         for item in book.items:
@@ -540,27 +596,27 @@ class EpubProcessor:
                 # Check if translation limit has been reached
                 if (self.config.translate_limit > 0 and 
                     self.translated_count >= self.config.translate_limit):
-                    logger.info(f"Translation limit of {self.config.translate_limit} reached")
+                    OutputManager().info(f"Translation limit of {self.config.translate_limit} reached")
                     break
         
         # Save the translated EPUB
         epub.write_epub(self.config.output_file, book)
-        logger.info(f"EPUB successfully translated and saved to {self.config.output_file}")
-        logger.info(f"Total text blocks translated: {self.translated_count}")
+        OutputManager().info(f"EPUB successfully translated and saved to {self.config.output_file}")
+        OutputManager().info(f"Total text blocks translated: {self.translated_count}")
 
     def _process_document(self, item):
         """Process a single document within the EPUB."""
-        logger.info("Processing document...")
+        OutputManager().info("Processing document")
         soup = BeautifulSoup(item.get_content(), 'html.parser')
 
         # Process each paragraph
         for tag in soup.find_all(['p']):
+            OutputManager().increase()
             # Extract text from paragraph
             full_text = tag.get_text()
             
             if not full_text.strip():
                 continue
-            
             # Create segments from the paragraph text
             segments = TextProcessor.segment_text(
                 full_text, 
@@ -581,7 +637,7 @@ class EpubProcessor:
                     self.translated_count >= self.config.translate_limit):
                     break
                 
-                logger.info(f"Translation ({self.translated_count + 1}): {segment[:50]}...")
+                OutputManager().status(f"{segment}")
                 self.translated_count += 1
                 
                 # Get and format the translation
@@ -632,26 +688,15 @@ def setup_argument_parser():
                         help='Computation device')
     parser.add_argument('--limit', type=int, default=0, 
                         help='Limit number of translations (0 for unlimited)')
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                        default='INFO', help='Logging level')
     parser.add_argument('--no-reset-frequency', action='store_true', 
                         help="Don't reset word frequency counter")
     parser.add_argument('--use-tags', action='store_true', help='Use tagged segment translation')
+    parser.add_argument('--no-progress', action='store_true', 
+                        help="Don't show progress bar (use logging instead)")
     
     return parser
 
 
-def configure_logging(log_level):
-    """Configure logging with the specified level."""
-    numeric_level = getattr(logging, log_level.upper(), None)
-    if not isinstance(numeric_level, int):
-        raise ValueError(f'Invalid log level: {log_level}')
-    
-    logger.setLevel(numeric_level)
-    
-    # Update handlers to use the new level
-    for handler in logger.handlers:
-        handler.setLevel(numeric_level)
 
 
 def config_from_args(args):
@@ -671,9 +716,9 @@ def config_from_args(args):
         max_keyword_count=args.max_keywords,
         device=args.device,
         translate_limit=args.limit,
-        log_level=args.log_level,
         reset_word_frequency=not args.no_reset_frequency,
-        use_tags=args.use_tags
+        use_tags=args.use_tags,
+        show_progress=not args.no_progress
     )
 
 
@@ -686,9 +731,7 @@ def main():
     # Create configuration
     config = config_from_args(args)
     
-    # Configure logging
-    configure_logging(config.log_level)
-    
+ 
     # Initialize components
     db_manager = DBManager(config.translation_db_path, config.wordlist_db_path)
     
@@ -708,17 +751,17 @@ def main():
         processor.process_file()
         
     except KeyboardInterrupt:
-        logger.info("Translation interrupted by user")
+        OutputManager().info("Translation interrupted by user")
         return 1
         
     except Exception as e:
-        logger.error(f"Error during translation: {e}", exc_info=True)
+        OutputManager().error(f"Error : {e}", exc_info=True)
         return 1
         
     finally:
         # Close database connections
         db_manager.close()
-    
+        OutputManager().init()
     return 0
 
 

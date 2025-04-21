@@ -11,7 +11,7 @@ dependencies = [
     "torch",
     "transformers",
     "beautifulsoup4",
-    "keybert"
+    "keybert",
+    "pyinstaller",
+    "tqdm"
 ]
-
-
