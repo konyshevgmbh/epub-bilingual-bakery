@@ -4,3 +4,6 @@ data/*
 hf_home/*
 
 *.egg-info/*
+.aider*
+/build/*
+/dist/*
