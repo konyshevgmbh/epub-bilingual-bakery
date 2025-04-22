@@ -1,13 +1,13 @@
 # 🇩🇪→🇷🇺 German to Bilingual German-Russian EPUB Translator
 
-This tool is designed for learners and language enthusiasts who want to transform German-language EPUBs into bilingual format. Each sentence is followed by a partial translation with key words and phrases explained in Russian. This method helps build understanding naturally and expand vocabulary through context.
+This tool is built for language learners and enthusiasts who want to convert German-language EPUB files into bilingual German-Russian format. Each sentence is followed by a partial translation, with key words and phrases explained in Russian. This method naturally enhances comprehension and expands vocabulary through context.
 
-By default: **German in → German-Russian EPUB out**  
-Other language pairs can also be used via parameters.
+**Default behavior:** **German in → German-Russian EPUB out**  
+Other language pairs can be configured via parameters.
 
 ---
 
-## 📘 `book_nllb.py` — Main Translator Script
+## 📘 `book_nllb.py` — Main Translation Script
 
 ![epub-bilingual-penetration banner](banner.png)
 
@@ -15,10 +15,10 @@ This script converts German EPUBs into bilingual German-Russian EPUBs using:
 
 - **Meta’s NLLB** for machine translation  
 - **KeyBERT** for keyword extraction  
-- Inline translations for improved contextual learning
+- Inline translation to support contextual learning
 
-> 💡 Recommended: Use **VS Code** with a **devcontainer** for a consistent environment.  
-> Or, if you prefer the usual workflow:
+> 💡 Tip: Use **VS Code** with a **devcontainer** for a consistent development environment.  
+> Alternatively, use the traditional workflow:
 
 ```bash
 uv venv
@@ -27,41 +27,41 @@ uv pip install .
 python book_nllb.py input.epub output.epub
 ```
 
-![Sample output of book_nllb.py](sample.png)
+![Sample output of book_nllb.py](sample1.png)
 
 ---
 
 ## 🗃️ `convert_sqlite.py` — Vocabulary Support Script
 
-Loads German nouns from a JSON file into an SQLite database.  
-This can be helpful when working with `book_nllb.py` for word lookups and review.
+This script loads German nouns from a JSON file into an SQLite database.  
+It's useful in combination with `book_nllb.py` for word lookups and vocabulary review.
 
 Reference file:  
 [german_nouns_output.json](https://github.com/Hanttone/der-die-das-game/blob/master/data/german_nouns_output.json)
-
 
 ---
 
 ## 🤖 `book_gemma.py` — Experimental Translation Script
 
-An alternative translation approach using **Gemma 3** via **Ollama**.
+An alternative translation method using **Gemma 3** via **Ollama**.
 
 - Outputs bilingual German-Russian translation in JSON format
 - Generates word frequency statistics
 - Allows filtering and selective translation
-- Intended for testing, not optimized for production use
+- Designed for experimentation; not optimized for production use
 
-> ⚠️ This is demo code with no setup or containerization. Useful for experiments or curiosity.
+> ⚠️ Demo code only — no setup or containerization included.
 
 ---
 
 ## 📦 Executable Release
 
-A standalone executable version of the tool is available for Windows, macOS, and Linux. This allows you to use the translator without installing Python or any dependencies.
+A standalone executable version is available for Windows, macOS, and Linux.  
+No need to install Python or any dependencies.
 
 ### Download
 
-Download the latest executable from the [Releases](https://github.com/konyshevgmbh/epub-bilingual-penetration/releases) page.
+Grab the latest executable from the [Releases](https://github.com/konyshevgmbh/epub-bilingual-penetration/releases) page.
 
 ### Usage
 
@@ -73,15 +73,35 @@ epub-bilingual-translator.exe input.epub output.epub
 ./epub-bilingual-translator input.epub output.epub
 ```
 
-### Building the Executable Yourself
+Example with language override:
 
-If you prefer to build the executable yourself:
+```bash
+epub-bilingual-translator.exe --tgt-lang eng_Latn "data\2.epub" out.epub
+```
 
-1. For Windows, run `build_executable.bat`
-2. For macOS/Linux, run `./build_executable.sh` (make it executable first with `chmod +x build_executable.sh`)
-
-For detailed instructions on creating and publishing releases, see [RELEASE_INSTRUCTIONS.md](RELEASE_INSTRUCTIONS.md).
+![Sample output of book_nllb.py](sample2.png)
 
 ---
 
-Pull requests are welcome. Suggestions appreciated. And yes, there might be a bug or two — feel free to point them out.
+## 🌐 Available Languages
+
+See all supported languages for each model family here:  
+https://dl-translate.readthedocs.io/en/latest/available_languages/
+
+---
+
+### 🔧 Build the Executable Yourself
+
+If you'd rather build it manually:
+
+1. On Windows: run `build_executable.bat`  
+2. On macOS/Linux: run `./build_executable.sh`  
+   (Make it executable first: `chmod +x build_executable.sh`)
+
+For release instructions, see [RELEASE_INSTRUCTIONS.md](RELEASE_INSTRUCTIONS.md).
+
+---
+
+Pull requests are welcome. Suggestions appreciated.  
+Yes, there might be a bug or two — feel free to point them out.
+
