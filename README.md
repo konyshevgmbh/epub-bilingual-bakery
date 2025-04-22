@@ -55,5 +55,33 @@ An alternative translation approach using **Gemma 3** via **Ollama**.
 
 ---
 
-Pull requests are welcome. Suggestions appreciated. And yes, there might be a bug or two — feel free to point them out.
+## 📦 Executable Release
 
+A standalone executable version of the tool is available for Windows, macOS, and Linux. This allows you to use the translator without installing Python or any dependencies.
+
+### Download
+
+Download the latest executable from the [Releases](https://github.com/konyshevgmbh/epub-bilingual-penetration/releases) page.
+
+### Usage
+
+```bash
+# Windows
+epub-bilingual-translator.exe input.epub output.epub
+
+# macOS/Linux
+./epub-bilingual-translator input.epub output.epub
+```
+
+### Building the Executable Yourself
+
+If you prefer to build the executable yourself:
+
+1. For Windows, run `build_executable.bat`
+2. For macOS/Linux, run `./build_executable.sh` (make it executable first with `chmod +x build_executable.sh`)
+
+For detailed instructions on creating and publishing releases, see [RELEASE_INSTRUCTIONS.md](RELEASE_INSTRUCTIONS.md).
+
+---
+
+Pull requests are welcome. Suggestions appreciated. And yes, there might be a bug or two — feel free to point them out.
