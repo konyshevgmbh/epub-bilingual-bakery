@@ -76,7 +76,7 @@ epub-bilingual-translator.exe input.epub output.epub
 Example with language override:
 
 ```bash
-epub-bilingual-translator.exe --tgt-lang eng_Latn "data\2.epub" out.epub
+epub-bilingual-translator.exe --tgt-lang eng_Latn in.epub out.epub
 ```
 
 ![Sample output of book_nllb.py](sample2.png)
