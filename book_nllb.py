@@ -690,7 +690,7 @@ def setup_argument_parser():
                         help='Limit number of translations (0 for unlimited)')
     parser.add_argument('--no-reset-frequency', action='store_true', 
                         help="Don't reset word frequency counter")
-    parser.add_argument('--use-tags', action='store_true', help='Use tagged segment translation')
+    parser.add_argument('--use-tags',default=True, action='store_true', help='Use tagged segment translation')
     parser.add_argument('--no-progress', action='store_true', 
                         help="Don't show progress bar (use logging instead)")
     
