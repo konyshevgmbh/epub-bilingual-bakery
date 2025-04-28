@@ -9,7 +9,6 @@ Other language pairs can be configured via parameters.
 
 ## 📘 `book_nllb.py` — Main Translation Script
 
-![epub-bilingual-penetration banner](banner.png)
 
 This script converts German EPUBs into bilingual German-Russian EPUBs using:
 
