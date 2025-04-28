@@ -99,6 +99,11 @@ If you'd rather build it manually:
 
 For release instructions, see [RELEASE_INSTRUCTIONS.md](RELEASE_INSTRUCTIONS.md).
 
+### 🛠️ Tips ###
+*   Use `uv` for fast environment setup (`uv venv && uv sync`).
+*   Use VS Code Dev Containers for a pre-built environment.
+*   Setup your huggegingface token
+*   PyTorch inside the container works smoothly with CUDA if the GPU supports it. Locally, you might need to tweak drivers and versions.
 ---
 
 Pull requests are welcome. Suggestions appreciated.  
