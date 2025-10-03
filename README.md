@@ -109,3 +109,13 @@ For release instructions, see [RELEASE_INSTRUCTIONS.md](RELEASE_INSTRUCTIONS.md)
 Pull requests are welcome. Suggestions appreciated.  
 Yes, there might be a bug or two — feel free to point them out.
 
+### See also: ###
+* [Lingtrain Aligner is a powerful, ML-powered library for accurately aligning texts in different languages](https://github.com/averkij/lingtrain-aligner)
+* [bilingual_book_maker - Make bilingual epub books using AI translate (GPT-4, Claude, Gemini)](https://github.com/yihong0618/bilingual_book_maker)
+* [epub-translator - Use LLM to losslessly translate EPUB e-books, retain the original layout](https://github.com/oomol-lab/epub-translator)
+* [biBooks - Create bilingual e-books using alignment of language agnostic sentence vectors](https://github.com/pschonev/biBooks)
+* [Moerkepub - Local EPUB translation using multilingual Transformer models on GPU](https://github.com/BLCK-B/Moerkepub)
+* [make-parallel-text - Make parallel text ebook from two translations for language learning](https://github.com/sowcow/make-parallel-text)
+* [Ebook-Translator-Calibre-Plugin - Calibre plugin to translate ebooks (Google Translate, ChatGPT, DeepL)](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin)
+* [jorkens - EPUB reader for foreign language learners with dictionary integration](https://github.com/mcthulhu/jorkens)
+
