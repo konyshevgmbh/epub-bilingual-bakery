@@ -53,6 +53,39 @@ An alternative translation method using **Gemma 3** via **Ollama**.
 
 ---
 
+## 📖 `book_vocab_tracker.py` — Adaptive Vocabulary Tracker
+
+Annotates a German EPUB with inline vocabulary glosses from a word list (e.g. Goethe B1).  
+No translation of sentences — only the words you want to learn, exactly where they appear.
+
+**How it works:**
+
+- Each word from the vocabulary list is annotated inline: **Gedanken** ( *Gedanke — мысль, идея*¹ )
+- The superscript shows which occurrence of that word this is (¹ first time, ² second, … up to ⁹)
+- A word is re-annotated at most every **N words** (default 100) to avoid repetition clutter
+- When the word appears in an inflected form, the base form is shown: **gründen** ( *основывать*¹ )
+- German noun articles are detected automatically via spaCy: **Metropole** ( *die Metropole — мегаполис*¹ )
+- A final chapter is appended with an **alphabetical glossary** and a **coverage summary** (words found in black, words not found in red)
+
+**Vocabulary file:** `vocab_b1_goethe_full.tsv` — 1 467 lemmas from the official Goethe-Zertifikat B1 word list with Russian translations.
+
+```bash
+python book_vocab_tracker.py input.epub output.epub --vocab vocab_b1_goethe_full.tsv
+
+# or use the batch file on Windows:
+run_vocab_tracker.bat input.epub
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--vocab` | `vocab_b1_goethe_full.tsv` | Path to TSV vocabulary file |
+| `--interval` | `100` | Min words between two annotations of the same word |
+| `--max` | `9` | Max annotations per word across the whole book |
+
+![Sample output of book_vocab_tracker.py](book_vocab_tracker_sample.png)
+
+---
+
 ## 📦 Executable Release
 
 A standalone executable version is available for Windows, macOS, and Linux.  
